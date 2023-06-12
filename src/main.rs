@@ -1,73 +1,72 @@
-use serde::Deserialize;
+mod commands;
+use std::collections::HashMap;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
+use poise::serenity_prelude as serenity;
+use commands::marks::{fetch_tank_data, Tank, marks};
 
-#[derive(Deserialize)]
-struct ApiResponse {
-    meta: MetaData,
-    data: Vec<Tank>,
+#[derive(Debug, EnumIter, PartialEq, Eq, Hash, poise::ChoiceParameter)]
+pub enum Region {
+    NA,
+    EU,
+    ASIA,
 }
 
-#[derive(Deserialize)]
-struct MetaData {
-    status: String,
+impl Region {
+    fn get_extension(&self) -> &str {
+        match self {
+            Region::NA => "com",
+            Region::EU => "eu",
+            Region::ASIA => "asia",
+        }
+    }
+    fn get_name(&self) -> &str {
+        match self {
+            Region::NA => "NA",
+            Region::EU => "EU",
+            Region::ASIA => "ASIA",
+        }
+    }
 }
 
-#[derive(Deserialize, Debug)]
-struct Tank {
-    id: u32,
-    image: String,
-    #[serde(rename = "isGift")]
-    is_gift: bool,
-    #[serde(rename = "isPrem")]
-    is_premium: bool,
-    name: String,
-    nation: String,
-    tier: u32,
-    class: String,
-    #[serde(rename = "50")]
-    pct_50: u32,
-    #[serde(rename = "65")]
-    pct_65: u32,
-    #[serde(rename = "85")]
-    pct_85: u32,
-    #[serde(rename = "95")]
-    pct_95: u32,
-    #[serde(rename = "100")]
-    pct_100: u32,
+
+pub struct Data {
+    tank_data: HashMap<Region, Vec<Tank>>
 }
+
+
+type Error = Box<dyn std::error::Error + Send + Sync>;
+type Context<'a> = poise::Context<'a, Data, Error>;
+
 
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = reqwest::Client::new();
-    let url = "https://api.tomato.gg/dev/api-v2/moe/com";
-    let response = client
-        .get(url)
-        .send()
-        .await?;
-    let response_text = response
-        .text()
-        .await?;
-    let response: ApiResponse = serde_json::from_str(&response_text)
-        .unwrap();
-    println!("status: {}", response.meta.status);
-    for tank in response.data {
-        println!("Tank Name: {}", tank.name);
-        println!("ID: {}", tank.id);
-        println!("Image URL: {}", tank.image);
-        println!("Is Gift: {}", tank.is_gift);
-        println!("Is Premium: {}", tank.is_premium);
-        println!("Nation: {}", tank.nation);
-        println!("Tier: {}", tank.tier);
-        println!("Class: {}", tank.class);
-        println!("50%: {}", tank.pct_50);
-        println!("65%: {}", tank.pct_65);
-        println!("85%: {}", tank.pct_85);
-        println!("95%: {}", tank.pct_95);
-        println!("100%: {}", tank.pct_100);
-        println!("-------------------------");
+async fn main() {
+    let mut tank_info = HashMap::new();
+    let mut tank_data;
+    for region in Region::iter() {
+        tank_data = fetch_tank_data(&region).await;
+        tank_info.insert(region, tank_data);
     }
-    Ok(())
 
+    let data = Data{
+        tank_data: tank_info,
+    };
+
+    let framework = poise::Framework::builder()
+        .options(poise::FrameworkOptions {
+            commands: vec![marks()],
+            ..Default::default()
+        })
+        .token(std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN"))
+        .intents(serenity::GatewayIntents::non_privileged())
+        .setup(|ctx, _ready, framework| {
+            Box::pin(async move {
+                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                Ok(data)
+            })
+        }); 
+    framework.run().await.unwrap();
 }
    
 

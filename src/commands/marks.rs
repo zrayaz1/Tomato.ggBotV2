@@ -141,7 +141,6 @@ pub async fn generate_mark_embed(tank_name: &str, tanks: Vec<Tank>) {
     let tank = tanks.iter().find(|tank| tank.name == tank_name); 
     let mut embed = CreateEmbed::default();
     embed.title("test");
-    embed.field("Marks(Dmg + Track/Spot)")
     
 }
 
