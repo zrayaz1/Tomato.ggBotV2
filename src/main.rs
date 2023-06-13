@@ -13,18 +13,11 @@ pub enum Region {
 }
 
 impl Region {
-    fn get_extension(&self) -> &str {
+    fn extension(&self) -> &str {
         match self {
             Region::NA => "com",
             Region::EU => "eu",
             Region::ASIA => "asia",
-        }
-    }
-    fn get_name(&self) -> &str {
-        match self {
-            Region::NA => "NA",
-            Region::EU => "EU",
-            Region::ASIA => "ASIA",
         }
     }
 }

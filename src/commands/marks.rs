@@ -70,9 +70,9 @@ pub struct Images {
 pub async fn fetch_tank_data(region: &Region) -> Vec<Tank> {
     let start = Instant::now();
     let moe_url = format!("https://api.tomato.gg/dev/api-v2/moe/{}",
-                          region.get_extension());
+                          region.extension());
     let mastery_url = format!("https://api.tomato.gg/dev/api-v2/mastery/{}",
-                              region.get_extension());
+                              region.extension());
     let moe: ApiResponse = reqwest::get(moe_url)
         .await
         .expect("MOE Api Failed")
@@ -120,12 +120,12 @@ pub async fn fetch_tank_data(region: &Region) -> Vec<Tank> {
         })
     .collect();
     let duration = start.elapsed();
-    println!("Fetched Tanks from {} in {:?}", region.get_name(), duration);
+    println!("Fetched Tanks from {} in {:?}", region.name(), duration);
     return tanks 
 }
 
 
-pub async fn fuzzy_find_tank(input: &str, tanks: &Vec<Tank>) {
+pub async fn fuzzy_find_tank(input: &str, tanks: &Vec<Tank>) -> String {
     let tank_name_list: Vec<String> = tanks.iter().map(|t| t.name.clone()).collect();
     let expected_name = process::extract_one(
         &input,
@@ -134,13 +134,26 @@ pub async fn fuzzy_find_tank(input: &str, tanks: &Vec<Tank>) {
         &fuzz::wratio,
         0,
         );
-    println!("think it's {}", expected_name.unwrap().0.as_str());
+    expected_name.unwrap().0
 }
 
-pub async fn generate_mark_embed(tank_name: &str, tanks: Vec<Tank>) {
-    let tank = tanks.iter().find(|tank| tank.name == tank_name); 
+pub async fn generate_mark_embed(tank: &Tank, region: &Region) -> CreateEmbed{
     let mut embed = CreateEmbed::default();
-    embed.title("test");
+    embed.title(format!("{} {}",tank.name, region.name()));
+    embed.url(format!("https://tomato.gg/tanks/NA/{}",tank.id));
+    embed.field("Marks(Dmg + Track/Spot)",
+    format!("1 Mark: `{}`\n2 Mark: `{}`\n3 Mark: `{}`\n100% MoE: `{}`",
+            tank.pct_65,tank.pct_85,tank.pct_95,tank.pct_100),true);
+    embed.field("Mastery(XP)",
+    format!("3rd Class: `{}`\n2nd Class: `{}`\n1st Class: `{}`\nMastery: `{}`",
+            tank.third,tank.second,tank.first,tank.ace),true);
+    embed.thumbnail(&tank.images.big_icon);
+    embed.footer(|f| {
+        f.text("Powered by Tomato.gg");
+        f.icon_url("https://tomato.gg/_next/image?url=%2Ftomato.png&w=48&q=75");
+        f
+        });
+    embed
     
 }
 
@@ -154,15 +167,19 @@ pub async fn marks(
     ) -> Result<(), Error> {
     match region{
         Some(region) => {
-            let region_data = ctx.data().tank_data.get(&region).unwrap();
-            let region_name = &region.get_name();
-            fuzzy_find_tank(&input, region_data).await;
-            ctx.say(format!("{} pee pee {}",region_name,input)).await?;
-        }
+            let tanks = ctx.data().tank_data.get(&region).unwrap();
+            let tank_name = fuzzy_find_tank(&input, tanks).await;
+            let tank = tanks.iter().find(|tank| tank.name == tank_name).unwrap();
+            let embed = generate_mark_embed(tank, &region).await;
+            ctx.send(|f| {f.embed(|f| {f.clone_from(&embed);f})}).await?;
+        }         
         None => {
-            let region_data = ctx.data().tank_data.get(&Region::NA).unwrap();
-            let region_name = &Region::NA.get_name();
-            ctx.say(format!("{} pee pee {}",region_name,input)).await?;
+            let region = Region::NA;
+            let tanks = ctx.data().tank_data.get(&region).unwrap();
+            let tank_name = fuzzy_find_tank(&input, tanks).await;
+            let tank = tanks.iter().find(|tank| tank.name == tank_name).unwrap();
+            let embed = generate_mark_embed(tank, &region).await;
+            ctx.send(|f| {f.embed(|f| {f.clone_from(&embed);f})}).await?;
         }
     }
     Ok(())
