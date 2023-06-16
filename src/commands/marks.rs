@@ -7,7 +7,7 @@ use fuzzywuzzy::process;
 use crate::{Region,Context, Error};
 
 #[derive(Deserialize)]
-pub struct ApiResponse {
+pub struct MarkResponse {
     meta: MetaData,
     data: Vec<Tank>,
 }
@@ -73,13 +73,13 @@ pub async fn fetch_tank_data(region: &Region) -> Vec<Tank> {
                           region.extension());
     let mastery_url = format!("https://api.tomato.gg/dev/api-v2/mastery/{}",
                               region.extension());
-    let moe: ApiResponse = reqwest::get(moe_url)
+    let moe: MarkResponse = reqwest::get(moe_url)
         .await
         .expect("MOE Api Failed")
         .json()
         .await
         .expect("MOE Json Conversion Failed");
-    let mastery: ApiResponse = reqwest::get(mastery_url)
+    let mastery: MarkResponse = reqwest::get(mastery_url)
         .await
         .expect("Mastery Api Failed")
         .json()
@@ -157,7 +157,6 @@ pub async fn generate_mark_embed(tank: &Tank, region: &Region) -> CreateEmbed{
     
 }
 
-
 #[poise::command(slash_command)]
 pub async fn marks(
     ctx: Context<'_>,
@@ -165,18 +164,25 @@ pub async fn marks(
     #[description = "Select a Region"]
     region: Option<Region>,
     ) -> Result<(), Error> {
+    //let mut test_hash_map = ctx.data().player_data.lock().await;
+    //let value = test_hash_map.entry(10).or_default();
+    //println!("{}",value);
+    //*value = String::from("Pee Pee");
+
     match region{
         Some(region) => {
-            let tanks = ctx.data().tank_data.get(&region).unwrap();
-            let tank_name = fuzzy_find_tank(&input, tanks).await;
+            let tank_map = ctx.data().tank_data.lock().await;
+            let tanks = tank_map.get(&region).unwrap();
+            let tank_name = fuzzy_find_tank(&input, &tanks).await;
             let tank = tanks.iter().find(|tank| tank.name == tank_name).unwrap();
             let embed = generate_mark_embed(tank, &region).await;
             ctx.send(|f| {f.embed(|f| {f.clone_from(&embed);f})}).await?;
         }         
         None => {
             let region = Region::NA;
-            let tanks = ctx.data().tank_data.get(&region).unwrap();
-            let tank_name = fuzzy_find_tank(&input, tanks).await;
+            let tank_map = ctx.data().tank_data.lock().await;
+            let tanks = tank_map.get(&region).unwrap();
+            let tank_name = fuzzy_find_tank(&input, &tanks).await;
             let tank = tanks.iter().find(|tank| tank.name == tank_name).unwrap();
             let embed = generate_mark_embed(tank, &region).await;
             ctx.send(|f| {f.embed(|f| {f.clone_from(&embed);f})}).await?;
