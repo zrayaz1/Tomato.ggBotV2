@@ -37,7 +37,7 @@ pub async fn fetch_overall_data(region: &Region, user_id: &u32) -> OverallData {
     let start = Instant::now();
 
     let overall_url = 
-        format!("https://api.tomato.gg/dev/api-v2/overall/{}/{}?cache=true", region.extension(), user_id);
+        format!("https://api.tomato.gg/dev/api-v2/overall/{}/{}", region.extension(), user_id);
     let overall_response: OverallResponse = 
         reqwest::get(overall_url).await.unwrap().json().await.unwrap();
     let duration = start.elapsed();

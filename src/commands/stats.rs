@@ -66,14 +66,18 @@ pub struct Player {
 
 
 
-pub async fn fetch_user_id(input: &str, region: &Region) -> u32{
+pub async fn fetch_user_id(input: &str, region: &Region) -> Option<u32>{
     let start = Instant::now();
     let wot_user_url = format!("https://api.worldoftanks.{}/wot/account/list/?language=en&application_id=42d1c07ba19a98fcbfdf5f3492bff972&search={}",
                            region.extension(), input);
     let response: UserSearch = reqwest::get(wot_user_url).await.unwrap().json().await.unwrap();
     let duration = start.elapsed();
     println!("Fetched user_id for {} in {:?}",input ,duration);
-    return response.data[0].account_id;
+    if response.data.len() > 0 {
+        println!("{}", response.data[0].account_id);
+        return Some(response.data[0].account_id);
+    }
+    None
 }
 
 pub async fn fetch_clan_info(region: &Region, account_id: &u32) -> PlayerAccountInfo {
@@ -87,6 +91,27 @@ pub async fn fetch_clan_info(region: &Region, account_id: &u32) -> PlayerAccount
     return output.clone();
 }
 
+pub async fn find_user_server(user: &str) -> Option<(Region, u32)> {
+    let (na, eu, asia) = join!(
+        fetch_user_id(&user, &Region::NA),
+        fetch_user_id(&user, &Region::EU),
+        fetch_user_id(&user, &Region::ASIA));         
+    match na {
+        Some(id) => {return Some((Region::NA, id));}
+        None => {}
+    }
+    match eu {
+        Some(id) => {return Some((Region::EU, id));}
+        None => {}
+    }
+    match asia {
+        Some(id) => {return Some((Region::ASIA, id));}
+        None => {}
+    }
+    None
+
+}
+
 #[poise::command(slash_command)]
 pub async fn stats(
     ctx: Context<'_>,
@@ -95,22 +120,42 @@ pub async fn stats(
     ) -> Result<(), Error> {
     let start = Instant::now();
     ctx.defer().await?;
+    let user_id;
+    let user_region;
     match region{
         Some(region) => {
-            let user_id = fetch_user_id(&user, &region).await;
-            let (overalls, recents, clan_info) = join!(
-                fetch_overall_data(&region, &user_id),
-                fetch_recent_data(&region, &user_id),
-                fetch_clan_info(&region, &user_id));
-
-            let duration = start.elapsed();
-
-            ctx.say(format!("cock balls {:?}", duration)).await?;
+            user_region = region;
+            match fetch_user_id(&user, &user_region).await {
+                Some(id) => {user_id = id}
+                None => {
+                    ctx.say("No user found with that name").await?;
+                    return Ok(());
+                }
+            }
         }
         None => {
-             let region = Region::NA;
+             let response = find_user_server(&user).await;
+             match response {
+                Some((server, id)) => {
+                    user_id = id;
+                    user_region = server;
+                }
+                None => {
+                    ctx.say("No Player found with that name").await?;
+                    return Ok(());
+                }
+             }
         } 
     }
+    
+    let (overalls, recents, clan_info) = join!(
+        fetch_overall_data(&user_region, &user_id),
+        fetch_recent_data(&user_region, &user_id),
+        fetch_clan_info(&user_region, &user_id));
+
+    let duration = start.elapsed();
+
+    ctx.say(format!("cock balls {:?}", duration)).await?;
     Ok(())
 }
 

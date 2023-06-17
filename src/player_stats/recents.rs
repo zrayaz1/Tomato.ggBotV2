@@ -70,7 +70,7 @@ pub struct TankStats {
 pub async fn fetch_recent_data(region: &Region, user_id: &u32) -> RecentsData {
     let start = Instant::now();
     let recents_url = 
-        format!("https://api.tomato.gg/dev/api-v2/recents/{}/{}?cache=true", region.extension(), user_id);
+        format!("https://api.tomato.gg/dev/api-v2/recents/{}/{}", region.extension(), user_id);
     let recents_response: RecentsResponse = 
         reqwest::get(recents_url).await.unwrap().json().await.unwrap();
     let duration = start.elapsed();
