@@ -8,7 +8,7 @@ use poise::serenity_prelude as serenity;
 use commands::marks::{fetch_tank_data, Tank, marks,};
 use commands::stats::stats;
  
-#[derive(Debug, EnumIter, PartialEq, Eq, Hash, poise::ChoiceParameter)]
+#[derive(Debug, EnumIter, PartialEq, Eq, Hash, poise::ChoiceParameter, Clone, Copy)]
 pub enum Region {
     NA,
     EU,
@@ -35,6 +35,42 @@ pub struct Data {
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
+pub fn get_short_position(position: &str) -> &str {
+    match position {
+        "executive_officer" => {"XO"}
+        "commander" => {"CDR"}
+        "personnel_officer" => {"PO"}
+        "combat_officer" => {"CO"}
+        "recruitment_officer" => {"RO"}
+        "intelligence_officer" => {"IO"}
+        "quartermaster" => {"QM"}
+        "junior_officer" => {"JO"}
+        "private" => {"PVT"}
+        "recruit" => {"RCT"}
+        "reservist" => {"RES"}
+        _ => {"Err"}
+    }
+                    
+}
+
+pub fn get_wn8_color(wn8: u32) -> i32 {
+    match wn8 {
+        0 => {0x808080}
+        1..=300 => {0x930D0D}
+        301..=450 => {0xCD3333}
+        451..=650 => {0xCC7A00}
+        651..=900 => {0xCCB800}
+        901..=1200 => {0x849B24}
+        1201..=1600 => {0x4D7326}
+        1601..=2000 => {0x4099BF}
+        2001..=2450 => {0x3972C6}
+        2451..=2900 => {0x6844d4}
+        2901..=3400 => {0x522b99}
+        3401..=4000 => {0x411d73}
+        4001..=4700 => {0x310d59}
+        4701..=u32::MAX => {0x24073d}
+    }
+}
 
 #[tokio::main]
 async fn main() {

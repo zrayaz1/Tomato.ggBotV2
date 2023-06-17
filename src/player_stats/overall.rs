@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use crate::Region;
-use crate::commands::stats::fetch_user_id;
+use crate::commands::stats::Player;
 use tokio::time::Instant;
 
 
@@ -17,31 +17,40 @@ struct Meta {
     cached: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct OverallData {
-    server: String,
-    id: u32,
-    battles: u32,
+    pub server: String,
+    pub id: u32,
+    pub battles: u32,
     #[serde(rename = "overallWN8")]
-    wn8: u32,
+    pub wn8: u32,
     #[serde(rename = "avgTier")]
-    tier: f32,
+    pub tier: f32,
     #[serde(rename = "winrate")]
-    win_rate: f32,
-    dpg: u32,
+    pub win_rate: f32,
+    pub dpg: u32,
 }
 
 
 
-pub async fn fetch_overall_data(region: &Region, user_id: &u32) -> OverallData {
+pub async fn fetch_overall_data(region: &Region, user: &Player, cached: bool) -> OverallData {
     let start = Instant::now();
+    let overall_url;
+    match cached {
+        true => { 
+        overall_url = 
+            format!("https://api.tomato.gg/dev/api-v2/overall/{}/{}?cache=true", region.extension(), user.account_id);
+        }
+        false => {
+        overall_url = 
+            format!("https://api.tomato.gg/dev/api-v2/overall/{}/{}", region.extension(), user.account_id);
+        }
+    }
 
-    let overall_url = 
-        format!("https://api.tomato.gg/dev/api-v2/overall/{}/{}", region.extension(), user_id);
     let overall_response: OverallResponse = 
         reqwest::get(overall_url).await.unwrap().json().await.unwrap();
     let duration = start.elapsed();
-    println!("fetched overall starts for {} in {:?}", user_id, duration);
+    println!("fetched overall starts for {} in {:?}", user.account_id, duration);
     overall_response.data
 }
 
