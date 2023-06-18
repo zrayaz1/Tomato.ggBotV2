@@ -7,7 +7,7 @@ use strum_macros::EnumIter;
 use poise::serenity_prelude as serenity;
 use commands::marks::{fetch_tank_data, Tank, marks,};
 use commands::stats::{stats, PlayerData};
- 
+use commands::clanstats::clanstats; 
 #[derive(Debug, EnumIter, PartialEq, Eq, Hash, poise::ChoiceParameter, Clone, Copy, Default)]
 pub enum Region {
     #[default]
@@ -92,7 +92,7 @@ async fn main() {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![marks(), stats()],
+            commands: vec![marks(), stats(), clanstats()],
             ..Default::default()
         })
         .token(std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN"))

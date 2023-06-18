@@ -39,12 +39,12 @@ pub struct PlayerClanInfo {
 
 #[derive(Deserialize, Clone)]
 pub struct Emblems {
-    x64: EmblemURL,
+    pub x64: EmblemURL,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct EmblemURL {
-    portal: String,
+    pub portal: String,
 }
 
 #[derive(Deserialize)]
