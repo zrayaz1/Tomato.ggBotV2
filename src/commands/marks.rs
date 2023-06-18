@@ -164,11 +164,6 @@ pub async fn marks(
     #[description = "Select a Region"]
     region: Option<Region>,
     ) -> Result<(), Error> {
-    //let mut test_hash_map = ctx.data().player_data.lock().await;
-    //let value = test_hash_map.entry(10).or_default();
-    //println!("{}",value);
-    //*value = String::from("Pee Pee");
-
     match region{
         Some(region) => {
             let tank_map = ctx.data().tank_data.lock().await;

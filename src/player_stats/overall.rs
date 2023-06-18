@@ -17,7 +17,7 @@ struct Meta {
     cached: bool,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Default)]
 pub struct OverallData {
     pub server: String,
     pub id: u32,

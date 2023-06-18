@@ -6,10 +6,11 @@ use tokio::sync::Mutex;
 use strum_macros::EnumIter;
 use poise::serenity_prelude as serenity;
 use commands::marks::{fetch_tank_data, Tank, marks,};
-use commands::stats::stats;
+use commands::stats::{stats, PlayerData};
  
-#[derive(Debug, EnumIter, PartialEq, Eq, Hash, poise::ChoiceParameter, Clone, Copy)]
+#[derive(Debug, EnumIter, PartialEq, Eq, Hash, poise::ChoiceParameter, Clone, Copy, Default)]
 pub enum Region {
+    #[default]
     NA,
     EU,
     ASIA,
@@ -28,7 +29,7 @@ impl Region {
 
 pub struct Data {
     tank_data: Mutex<HashMap<Region, Vec<Tank>>>,
-    player_data: Mutex<HashMap<u32, String>>,
+    player_data: Mutex<HashMap<u32, PlayerData>>,
 }
 
 

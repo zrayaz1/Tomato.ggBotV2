@@ -26,7 +26,7 @@ struct Meta {
     cached: bool,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Default)]
 pub struct RecentsData {
     pub recent24hr: TimeFrame,
     pub recent3days: TimeFrame,
@@ -37,7 +37,7 @@ pub struct RecentsData {
     pub recent100battles: TimeFrame,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Default)]
 pub struct TimeFrame {
     pub overall: OverallStats,
     #[serde(rename = "tankStats")]
@@ -45,7 +45,7 @@ pub struct TimeFrame {
     pub tank_stats: Vec<TankStats>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Default)]
 pub struct OverallStats {
     pub battles: u32,
     #[serde(deserialize_with = "deserialize_default")]

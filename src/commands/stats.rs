@@ -1,11 +1,13 @@
 use crate::{player_stats::{overall::{fetch_overall_data, OverallData}, recents::TimeFrame}, Region, Error, Context};
-use std::time::Instant;
+use std::{time::Instant, str::FromStr};
 use crate::player_stats::recents::{fetch_recent_data, RecentsData};
 use crate::{get_wn8_color, get_short_position};
 use serde::Deserialize;
+use strum_macros::EnumIter;
 use tokio::join;
 use std::collections::HashMap;
-use poise::serenity_prelude::CreateEmbed;
+use poise::{serenity_prelude::{CreateEmbed, CreateSelectMenuOption, CreateSelectMenuOptions, CreateSelectMenu}, CreateReply};
+use strum::{IntoEnumIterator};
 
 #[derive(Deserialize)]
 pub struct ClanInfoResponse {
@@ -52,12 +54,13 @@ pub struct UserSearch {
 }
 
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Default)]
 pub struct Player {
     pub nickname: String,
     pub account_id: u32,
 }
 
+#[derive(Default)]
 pub struct PlayerData {
     wot_clan: Option<PlayerAccountInfo>,
     player: Player,
@@ -66,7 +69,7 @@ pub struct PlayerData {
     recents: RecentsData,
 }
 
-#[derive(poise::ChoiceParameter, Clone, Copy)]
+#[derive(poise::ChoiceParameter, Clone, Copy, EnumIter)]
 pub enum Period {
     R24HR,
     R3DAYS,
@@ -247,7 +250,22 @@ pub async fn generate_main_stat_embed(data: &PlayerData) -> CreateEmbed{
     embed
 }
 
+pub fn create_select_menu(id: u64) -> CreateSelectMenu {
+    let mut options = CreateSelectMenuOptions::default();
+    let mut select_menu = CreateSelectMenu::default(); 
 
+    for period in Period::iter() {
+        let mut option = CreateSelectMenuOption::default();
+        option.label(period.nice_name());
+        option.value(period);
+        options.add_option(option);
+    }
+    select_menu.custom_id(id);
+    select_menu.min_values(1);
+    select_menu.max_values(1);
+    select_menu.options(|o| {o.clone_from(&options); o});
+    select_menu
+}
 
 #[poise::command(slash_command)]
 pub async fn stats(
@@ -257,6 +275,7 @@ pub async fn stats(
     #[description = "Detailed Stats for a Period"] period: Option<Period>,
     ) -> Result<(), Error> {
     ctx.defer().await?;
+    let uuid = ctx.id();
     let user_info;
     let user_region;
     match region{
@@ -310,8 +329,8 @@ pub async fn stats(
     }
     let message = ctx.send(|f| {f.embed(|f| {f.clone_from(&embed);f})}).await?;
     (overalls, recents) = join!(
-        fetch_overall_data(&user_region,&user_info, true),
-        fetch_recent_data(&user_region, &user_info, true),
+        fetch_overall_data(&user_region,&user_info, false),
+        fetch_recent_data(&user_region, &user_info, false),
         );
     all_data.recents = recents;
     all_data.overall = overalls;
@@ -323,10 +342,47 @@ pub async fn stats(
             embed = generate_main_stat_embed(&all_data).await;
         }
     }
-
-    message.edit(ctx,|f| {f.embed(|f| {f.clone_from(&embed);f})}).await?;
+   message.edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
+        .components(|c| {
+            c.create_action_row(|ar| {
+                ar.create_select_menu(|sm| {
+                    sm.clone_from(&create_select_menu(uuid)); sm
+                })
+            })
+        })
+    }).await?;
+    while let Some(mci) = poise::serenity_prelude::CollectComponentInteraction::new(ctx)
+        .author_id(ctx.author().id)
+        .channel_id(ctx.channel_id())
+        .timeout(std::time::Duration::from_secs(120))
+        .filter(move |mci| mci.data.custom_id == uuid.to_string())
+        .await 
+        {    
+            let period = mci.data.values.first().unwrap();
+            println!("{}",period);
+            embed = generate_period_embed(&all_data, Period::from_str(period).unwrap()).await;
+            
+            message.edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
+                .components(|c| {
+                    c.create_action_row(|ar| {
+                        ar.create_select_menu(|sm| {
+                            sm.clone_from(&create_select_menu(uuid)); sm
+                        })
+                    })
+                })
+            }).await?;
+            mci.create_interaction_response(ctx, |ir| {
+            ir.kind(poise::serenity_prelude::InteractionResponseType::DeferredUpdateMessage)
+            })
+            .await?; 
+            
+        }
     Ok(())
 }
+
+
+
+
 
 
 
