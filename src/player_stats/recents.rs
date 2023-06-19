@@ -1,8 +1,9 @@
 use serde::Deserialize;
 use serde::Deserializer;
+use crate::Error;
 use crate::Region;
 use crate::commands::stats::Player;
-use tokio::time::Instant;
+use tokio::time::{Instant, timeout, Duration};
 
 
 fn deserialize_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
@@ -72,7 +73,7 @@ pub struct TankStats {
 }
 
 
-pub async fn fetch_recent_data(region: &Region, user: &Player, cached: bool) -> RecentsData {
+pub async fn fetch_recent_data(region: &Region, user: &Player, cached: bool) -> Option<RecentsData> {
     let start = Instant::now();
     let recents_url;
     match cached {
@@ -85,12 +86,16 @@ pub async fn fetch_recent_data(region: &Region, user: &Player, cached: bool) -> 
             format!("https://api.tomato.gg/dev/api-v2/recents/{}/{}", region.extension(), user.account_id);
         }
     }
-
-    let recents_response: RecentsResponse = 
-        reqwest::get(recents_url).await.unwrap().json().await.unwrap();
-    let duration = start.elapsed();
-    println!("fetched recent stats for {} in {:?}", user.account_id, duration);
-    recents_response.data
-    
+    let response = timeout(Duration::from_secs(10), reqwest::get(&recents_url)).await;
+    match response {
+        Ok(Ok(resp)) => {
+            let recents_response: RecentsResponse = resp.json().await.unwrap();
+            let duration = start.elapsed();
+            println!("fetched recent stats for {} in {:?}", user.account_id, duration);
+            Some(recents_response.data)
+        }
+        Ok(Err(err)) => {None}
+        Err(err) => {None}
+    }
 }
 

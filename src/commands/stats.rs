@@ -6,8 +6,10 @@ use serde::Deserialize;
 use strum_macros::EnumIter;
 use tokio::join;
 use std::collections::HashMap;
-use poise::{serenity_prelude::{CreateEmbed, CreateSelectMenuOption, CreateSelectMenuOptions, CreateSelectMenu}, CreateReply};
+use poise::{serenity_prelude::{CreateEmbed, CreateSelectMenuOption, CreateSelectMenuOptions, CreateSelectMenu, ComponentType}, CreateReply};
 use strum::{IntoEnumIterator};
+use super::clanstats::{fetch_all_clan, generate_clan_embed, ClanData};
+
 
 #[derive(Deserialize)]
 pub struct ClanInfoResponse {
@@ -50,6 +52,7 @@ pub struct EmblemURL {
 #[derive(Deserialize)]
 pub struct UserSearch {
     status: String,
+    #[serde(default)]
     data: Vec<Player>,
 }
 
@@ -109,7 +112,7 @@ impl Period {
 pub async fn fetch_user_id(input: &str, region: &Region) -> Option<Player>{
     let start = Instant::now();
     let wot_user_url = format!("https://api.worldoftanks.{}/wot/account/list/?language=en&application_id=42d1c07ba19a98fcbfdf5f3492bff972&search={}",
-                           region.extension(), input);
+                               region.extension(), input);
     let response: UserSearch = reqwest::get(wot_user_url).await.unwrap().json().await.unwrap();
     let duration = start.elapsed();
     println!("Fetched user_id for {} in {:?}",input ,duration);
@@ -183,7 +186,7 @@ pub async fn generate_period_embed(player_data: &PlayerData, period: Period) -> 
                 tank.wn8,
                 tank.dpg),true);
     }
-
+    embed.color(get_wn8_color(data.overall.wn8));
     embed
 }
 
@@ -191,10 +194,10 @@ pub async fn generate_main_stat_embed(data: &PlayerData) -> CreateEmbed{
     let mut embed = CreateEmbed::default();
     embed.title(format!("{}'s Stats", data.player.nickname));
     embed.url(format!("https://tomato.gg/stats/{}/{}={}",
-              data.region.name(),
-              data.player.nickname,
-              data.player.account_id));
-    
+                      data.region.name(),
+                      data.player.nickname,
+                      data.player.account_id));
+
     embed.field("**Overall**", 
                 format!("Battles: `{}`\nWN8: `{}`\nWinRate: `{}%`\nAvgTier: `{}`",
                         data.overall.battles,
@@ -278,6 +281,7 @@ pub async fn stats(
     let uuid = ctx.id();
     let user_info;
     let user_region;
+    let is_in_clan: bool;
     match region{
         Some(region) => {
             user_region = region;
@@ -285,13 +289,13 @@ pub async fn stats(
                 Some(player) => {user_info = player}
                 None => {
                     ctx.say("No user found with that name").await?;
-                  return Ok(());
+                    return Ok(());
                 }
             }
         }
         None => {
-             let response = find_user_server(&user).await;
-             match response {
+            let response = find_user_server(&user).await;
+            match response {
                 Some((server, player)) => {
                     user_info = player;
                     user_region = server;
@@ -300,15 +304,15 @@ pub async fn stats(
                     ctx.say("No Player found with that name").await?;
                     return Ok(());
                 }
-             }
+            }
         } 
     }
-    
-    let (mut overalls, mut recents, clan_info) = join!(
+    let (mut overalls, mut try_recents, clan_info) = join!(
         fetch_overall_data(&user_region, &user_info, true),
         fetch_recent_data(&user_region, &user_info, true),
         fetch_clan_info(&user_region, &user_info));
 
+    let mut recents = try_recents.unwrap();
 
     let mut all_data = PlayerData {
         wot_clan: clan_info.clone(),
@@ -328,10 +332,35 @@ pub async fn stats(
         }
     }
     let message = ctx.send(|f| {f.embed(|f| {f.clone_from(&embed);f})}).await?;
-    (overalls, recents) = join!(
-        fetch_overall_data(&user_region,&user_info, false),
-        fetch_recent_data(&user_region, &user_info, false),
-        );
+    let full_clan_data: Option<ClanData>;
+    match &all_data.wot_clan {
+        Some(clan) => {
+            let some_clan_data;
+            is_in_clan = true;
+            (some_clan_data, overalls, try_recents) = join!(
+                fetch_all_clan(&user_region, clan.clan.clan_id),
+                fetch_overall_data(&user_region, &user_info, false),
+                fetch_recent_data(&user_region, &user_info, false),
+                );
+            match try_recents {
+                Some(r) => {recents = r;}
+                None => {}
+            }
+            full_clan_data = Some(some_clan_data);
+        }
+        None => {
+            is_in_clan = false;
+            (overalls, try_recents) = join!(
+                fetch_overall_data(&user_region,&user_info, false),
+                fetch_recent_data(&user_region, &user_info, false),
+                );
+            match try_recents {
+                Some(r) => {recents = r;}
+                None => {}
+            }
+            full_clan_data = None;
+        }
+    }
     all_data.recents = recents;
     all_data.overall = overalls;
     match period {
@@ -342,41 +371,157 @@ pub async fn stats(
             embed = generate_main_stat_embed(&all_data).await;
         }
     }
-   message.edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
-        .components(|c| {
-            c.create_action_row(|ar| {
-                ar.create_select_menu(|sm| {
-                    sm.clone_from(&create_select_menu(uuid)); sm
-                })
-            })
-        })
-    }).await?;
-    while let Some(mci) = poise::serenity_prelude::CollectComponentInteraction::new(ctx)
-        .author_id(ctx.author().id)
-        .channel_id(ctx.channel_id())
-        .timeout(std::time::Duration::from_secs(120))
-        .filter(move |mci| mci.data.custom_id == uuid.to_string())
-        .await 
-        {    
-            let period = mci.data.values.first().unwrap();
-            println!("{}",period);
-            embed = generate_period_embed(&all_data, Period::from_str(period).unwrap()).await;
-            
-            message.edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
-                .components(|c| {
-                    c.create_action_row(|ar| {
-                        ar.create_select_menu(|sm| {
-                            sm.clone_from(&create_select_menu(uuid)); sm
-                        })
+
+    if is_in_clan {
+        message.edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
+            .components(|c| {
+                c.create_action_row(|ar| {
+                    ar.create_select_menu(|sm| {
+                        sm.clone_from(&create_select_menu(uuid)); sm
                     })
                 })
-            }).await?;
-            mci.create_interaction_response(ctx, |ir| {
-            ir.kind(poise::serenity_prelude::InteractionResponseType::DeferredUpdateMessage)
+                .create_action_row(|ar| {
+                    ar.create_button(|b| {
+                        b.custom_id(uuid*2)
+                            .style(poise::serenity_prelude::ButtonStyle::Primary)
+                            .label("Player Stats")
+                    })
+                    .create_button(|b| {
+                        b.custom_id(uuid*3)
+                            .style(poise::serenity_prelude::ButtonStyle::Success)
+                            .label("Clan Stats")
+
+                    })
+                })
             })
-            .await?; 
-            
-        }
+        }).await?;
+    }
+    else {
+        message.edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
+            .components(|c| {
+                c.create_action_row(|ar| {
+                    ar.create_select_menu(|sm| {
+                        sm.clone_from(&create_select_menu(uuid)); sm
+                    })
+                })
+            })
+        }).await?;
+    }
+
+    while let Some(mci) = poise::serenity_prelude::CollectComponentInteraction::new(ctx)
+        .author_id(ctx.author().id)
+            .channel_id(ctx.channel_id())
+            .timeout(std::time::Duration::from_secs(300))
+            .filter(move |mci| mci.data.custom_id == uuid.to_string() || mci.data.custom_id == (uuid*2).to_string() || mci.data.custom_id == (uuid*3).to_string() )
+            .await 
+            {   
+                match mci.data.component_type {
+                    ComponentType::SelectMenu => {
+                        let period = mci.data.values.first().unwrap();
+                        println!("{}",period);
+                        embed = generate_period_embed(&all_data, Period::from_str(period).unwrap()).await;
+                        if is_in_clan {
+                            message.edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
+                                .components(|c| {
+                                    c.create_action_row(|ar| {
+                                        ar.create_select_menu(|sm| {
+                                            sm.clone_from(&create_select_menu(uuid)); sm
+                                        })
+                                    })
+                                    .create_action_row(|ar| {
+                                        ar.create_button(|b| {
+                                            b.custom_id(uuid*2)
+                                                .style(poise::serenity_prelude::ButtonStyle::Primary)
+                                                .label("Player Stats")
+                                        })
+                                        .create_button(|b| {
+                                            b.custom_id(uuid*3)
+                                                .style(poise::serenity_prelude::ButtonStyle::Success)
+                                                .label("Clan Stats")
+
+                                        })
+                                    })
+                                })
+                            }).await?;
+                        }
+                        else {
+
+                            message.edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
+                                .components(|c| {
+                                    c.create_action_row(|ar| {
+                                        ar.create_select_menu(|sm| {
+                                            sm.clone_from(&create_select_menu(uuid)); sm
+                                        })
+                                    })
+                                })
+                            }).await?;
+
+
+                        }
+                    }
+                    ComponentType::Button => {
+                        let player_id = (uuid*2).to_string();
+                        let clan_id = (uuid*3).to_string();
+                        if mci.data.custom_id.clone() == player_id {
+                            embed = generate_main_stat_embed(&all_data).await;
+                            message.edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
+                                .components(|c| {
+                                    c.create_action_row(|ar| {
+                                        ar.create_select_menu(|sm| {
+                                            sm.clone_from(&create_select_menu(uuid)); sm
+                                        })
+                                    })
+                                    .create_action_row(|ar| {
+                                        ar.create_button(|b| {
+                                            b.custom_id(uuid*2)
+                                                .style(poise::serenity_prelude::ButtonStyle::Primary)
+                                                .label("Player Stats")
+                                        })
+                                        .create_button(|b| {
+                                            b.custom_id(uuid*3)
+                                                .style(poise::serenity_prelude::ButtonStyle::Success)
+                                                .label("Clan Stats")
+
+                                        })
+                                    })
+                                })
+                            }).await?;
+
+
+                        }
+                        else if mci.data.custom_id.clone() == clan_id {
+                            embed = generate_clan_embed(full_clan_data.as_ref().unwrap()).await;
+
+                            message.edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
+                                .components(|c| {
+                                    c.create_action_row(|ar| {
+                                        ar.create_button(|b| {
+                                            b.custom_id(uuid*2)
+                                                .style(poise::serenity_prelude::ButtonStyle::Primary)
+                                                .label("Player Stats")
+                                        })
+                                        .create_button(|b| {
+                                            b.custom_id(uuid*3)
+                                                .style(poise::serenity_prelude::ButtonStyle::Success)
+                                                .label("Clan Stats")
+
+                                        })
+                                    })
+                                })
+                            }).await?;
+
+
+                        }
+
+                    }
+                    _ => {println!("cock");}
+                }
+
+                mci.create_interaction_response(ctx, |ir| {
+                    ir.kind(poise::serenity_prelude::InteractionResponseType::DeferredUpdateMessage)
+                })
+                .await?; 
+            }
     Ok(())
 }
 

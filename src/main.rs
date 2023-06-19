@@ -2,12 +2,13 @@ mod commands;
 mod player_stats;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
-//use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use poise::serenity_prelude as serenity;
 use commands::marks::{fetch_tank_data, Tank, marks,};
-use commands::stats::{stats, PlayerData};
+use commands::stats::stats;
 use commands::clanstats::clanstats; 
+
+
 #[derive(Debug, EnumIter, PartialEq, Eq, Hash, poise::ChoiceParameter, Clone, Copy, Default)]
 pub enum Region {
     #[default]
@@ -29,7 +30,6 @@ impl Region {
 
 pub struct Data {
     tank_data: Mutex<HashMap<Region, Vec<Tank>>>,
-    player_data: Mutex<HashMap<u32, PlayerData>>,
 }
 
 
@@ -87,7 +87,6 @@ async fn main() {
 
     let data = Data{
         tank_data: Mutex::new(tank_info),
-        player_data: Mutex::new(HashMap::new()),
     };
 
     let framework = poise::Framework::builder()
