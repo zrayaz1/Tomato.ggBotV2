@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use poise::serenity_prelude as serenity;
+
 use serde::Deserialize;
 use poise::serenity_prelude::CreateEmbed;
 use crate::{Region, Error, Context};

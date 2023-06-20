@@ -6,7 +6,7 @@ use serde::Deserialize;
 use strum_macros::EnumIter;
 use tokio::join;
 use std::collections::HashMap;
-use poise::{serenity_prelude::{CreateEmbed, CreateSelectMenuOption, CreateSelectMenuOptions, CreateSelectMenu, ComponentType}, CreateReply};
+use poise::{serenity_prelude::{CreateEmbed, CreateSelectMenuOption, CreateSelectMenuOptions, CreateSelectMenu, ComponentType}};
 use strum::{IntoEnumIterator};
 use super::clanstats::{fetch_all_clan, generate_clan_embed, ClanData};
 

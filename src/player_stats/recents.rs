@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use serde::Deserializer;
-use crate::Error;
+
 use crate::Region;
 use crate::commands::stats::Player;
 use tokio::time::{Instant, timeout, Duration};
