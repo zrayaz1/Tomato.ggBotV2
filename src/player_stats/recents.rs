@@ -17,15 +17,9 @@ where
 
 #[derive(Debug, Deserialize)]
 struct RecentsResponse {
-    meta: Meta,
     data: RecentsData,
 }
 
-#[derive(Debug, Deserialize)]
-struct Meta {
-    id: String,
-    cached: bool,
-}
 
 #[derive(Debug, Deserialize, Clone, Default)]
 pub struct RecentsData {
@@ -94,8 +88,8 @@ pub async fn fetch_recent_data(region: &Region, user: &Player, cached: bool) -> 
             println!("fetched recent stats for {} in {:?}", user.account_id, duration);
             Some(recents_response.data)
         }
-        Ok(Err(err)) => {None}
-        Err(err) => {None}
+        Ok(Err(_)) => {None}
+        Err(_) => {None}
     }
 }
 

@@ -6,16 +6,9 @@ use tokio::time::Instant;
 
 #[derive(Deserialize)]
 struct OverallResponse {
-    meta: Meta,
     data: OverallData,
 }
 
-#[derive(Deserialize)]
-struct Meta {
-    status: String,
-    id: String,
-    cached: bool,
-}
 
 #[derive(Deserialize, Clone, Default)]
 pub struct OverallData {
