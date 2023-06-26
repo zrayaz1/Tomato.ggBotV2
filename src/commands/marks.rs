@@ -1,10 +1,14 @@
 use poise::serenity_prelude::CreateEmbed;
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::time::Duration;
 use std::time::Instant;
 use fuzzywuzzy::fuzz;
 use fuzzywuzzy::utils;
 use fuzzywuzzy::process;
 use crate::{Region,Context, Error};
+use tokio::{task, time};
+
 
 #[derive(Deserialize)]
 pub struct MarkResponse {
@@ -183,6 +187,29 @@ pub async fn marks(
             ctx.send(|f| {f.embed(|f| {f.clone_from(&embed);f})}).await?;
         }
     }
+    if !*ctx.data().loop_running.lock().await {
+        let mut interval = time::interval(Duration::from_secs(120));
+        *ctx.data().loop_running.lock().await = true;
+        loop {
+            interval.tick().await;
+            let (na, eu, asia) = tokio::join!(
+                fetch_tank_data(&Region::NA),
+                fetch_tank_data(&Region::EU),
+                fetch_tank_data(&Region::ASIA));
+            let mut old_map = ctx.data().tank_data.lock().await;
+            let old_na = old_map.entry(Region::NA).or_default();
+            *old_na = na;
+            let old_eu = old_map.entry(Region::EU).or_default();
+            *old_eu = eu;
+            let old_asia = old_map.entry(Region::ASIA).or_default();
+            *old_asia = asia;
+        }
+    }
+
+
+    
+
+
     Ok(())
 }
 

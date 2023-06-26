@@ -30,6 +30,7 @@ impl Region {
 
 pub struct Data {
     tank_data: Mutex<HashMap<Region, Vec<Tank>>>,
+    loop_running: Mutex<bool>,
 }
 
 
@@ -87,6 +88,7 @@ async fn main() {
 
     let data = Data{
         tank_data: Mutex::new(tank_info),
+        loop_running: Mutex::new(false),
     };
 
     let framework = poise::Framework::builder()
