@@ -188,7 +188,7 @@ pub async fn marks(
         }
     }
     if !*ctx.data().loop_running.lock().await {
-        let mut interval = time::interval(Duration::from_secs(120));
+        let mut interval = time::interval(Duration::from_secs(36000));
         *ctx.data().loop_running.lock().await = true;
         loop {
             interval.tick().await;
