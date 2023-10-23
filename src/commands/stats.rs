@@ -39,12 +39,12 @@ pub struct PlayerClanInfo {
 }
 
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Default)]
 pub struct Emblems {
     pub x64: EmblemURL,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Default)]
 pub struct EmblemURL {
     pub portal: String,
 }
@@ -100,7 +100,7 @@ impl Period {
         match self {
             Period::R24HR => data.recents.recent24hr.clone(),
             Period::R3DAYS => data.recents.recent3days.clone(),
-            Period::R7DAYS => data.recents.recent3days.clone(),
+            Period::R7DAYS => data.recents.recent7days.clone(),
             Period::R30DAYS => data.recents.recent30days.clone(),
             Period::R60DAYS => data.recents.recent60days.clone(),
             Period::R1000BATTLES => data.recents.recent1000battles.clone(),
