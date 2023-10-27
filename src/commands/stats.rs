@@ -63,7 +63,7 @@ pub struct Player {
     pub account_id: u32,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct PlayerData {
     wot_clan: Option<PlayerAccountInfo>,
     player: Player,
@@ -96,7 +96,7 @@ impl Period {
             Period::R100BATTLES => "100 Battles",
         }
     }
-    fn get_period_data(&self, data: &PlayerData) -> TimeFrame{
+    fn get_period_data(&self, data: PlayerData) -> TimeFrame{
         match self {
             Period::R24HR => data.recents.recent24hr.clone(),
             Period::R3DAYS => data.recents.recent3days.clone(),
@@ -109,7 +109,7 @@ impl Period {
     }
 }
 
-pub async fn fetch_user_id(input: &str, region: &Region) -> Option<Player>{
+pub async fn fetch_user_id(input: &str, region: Region) -> Option<Player>{
     let start = Instant::now();
     let wot_user_url = format!("https://api.worldoftanks.{}/wot/account/list/?language=en&application_id=42d1c07ba19a98fcbfdf5f3492bff972&search={}",
                                region.extension(), input);
@@ -123,7 +123,7 @@ pub async fn fetch_user_id(input: &str, region: &Region) -> Option<Player>{
     None
 }
 
-pub async fn fetch_clan_info(region: &Region, player: &Player) -> Option<PlayerAccountInfo> {
+pub async fn fetch_clan_info(region: Region, player: Player) -> Option<PlayerAccountInfo> {
     let start = Instant::now();
     let clan_info_url = format!("https://api.worldoftanks.{}/wot/clans/accountinfo/?application_id=20e1e0e4254d98635796fc71f2dfe741&account_id={}",
                                 region.extension(), player.account_id);
@@ -139,9 +139,9 @@ pub async fn fetch_clan_info(region: &Region, player: &Player) -> Option<PlayerA
 
 pub async fn find_user_server(user: &str) -> Option<(Region, Player)> {
     let (na, eu, asia) = join!(
-        fetch_user_id(&user, &Region::NA),
-        fetch_user_id(&user, &Region::EU),
-        fetch_user_id(&user, &Region::ASIA));         
+        fetch_user_id(user, Region::NA),
+        fetch_user_id(user, Region::EU),
+        fetch_user_id(user, Region::ASIA));         
     match na {
         Some(player) => {return Some((Region::NA, player));}
         None => {}
@@ -158,10 +158,10 @@ pub async fn find_user_server(user: &str) -> Option<(Region, Player)> {
 }
 
 
-pub async fn generate_period_embed(player_data: &PlayerData, period: Period) -> CreateEmbed {
+pub async fn generate_period_embed(player_data: PlayerData, period: Period) -> CreateEmbed {
     const DISPLAY_AMMOUNT: usize = 5;
     let mut embed = CreateEmbed::default();
-    let data = period.get_period_data(player_data);
+    let data = period.get_period_data(player_data.clone());
     let mut tanks = data.tank_stats;
     embed.title(format!("{}'s Stats", player_data.player.nickname));
     embed.description(format!("**Last {} Stats**",period.nice_name()));
@@ -255,19 +255,26 @@ pub async fn generate_main_stat_embed(data: &PlayerData) -> CreateEmbed{
 
 pub fn create_select_menu(id: u64) -> CreateSelectMenu {
     let mut options = CreateSelectMenuOptions::default();
-    let mut select_menu = CreateSelectMenu::default(); 
 
-    for period in Period::iter() {
-        let mut option = CreateSelectMenuOption::default();
-        option.label(period.nice_name());
-        option.value(period);
-        options.add_option(option);
-    }
-    select_menu.custom_id(id);
-    select_menu.min_values(1);
-    select_menu.max_values(1);
-    select_menu.options(|o| {o.clone_from(&options); o});
-    select_menu
+    Period::iter()
+        .map(|period| 
+            options
+            .add_option(
+                CreateSelectMenuOption::default()
+                .label(period.nice_name())
+                .value(period)
+                .to_owned()
+            )
+        );
+
+
+    CreateSelectMenu::default()
+        .custom_id(id)
+        .min_values(1)
+        .max_values(1)
+        .options(|o| {o.clone_from(&options); o})
+        .to_owned()
+
 }
 
 #[poise::command(slash_command)]
@@ -276,7 +283,8 @@ pub async fn stats(
     #[description = "Players Username"] user: String,
     #[description = "Select a Region"] region: Option<Region>,
     #[description = "Detailed Stats for a Period"] period: Option<Period>,
-    ) -> Result<(), Error> {
+) -> Result<(), Error> {
+
     ctx.defer().await?;
     let uuid = ctx.id();
     let user_info;
@@ -285,7 +293,7 @@ pub async fn stats(
     match region{
         Some(region) => {
             user_region = region;
-            match fetch_user_id(&user, &user_region).await {
+            match fetch_user_id(user.as_str(), user_region).await {
                 Some(player) => {user_info = player}
                 None => {
                     ctx.say("No user found with that name").await?;
@@ -308,9 +316,9 @@ pub async fn stats(
         } 
     }
     let (mut overalls, mut try_recents, clan_info) = join!(
-        fetch_overall_data(&user_region, &user_info, true),
-        fetch_recent_data(&user_region, &user_info, true),
-        fetch_clan_info(&user_region, &user_info));
+        fetch_overall_data(user_region, user_info, true),
+        fetch_recent_data(user_region, user_info, true),
+        fetch_clan_info(user_region, user_info));
 
     let mut recents = try_recents.unwrap();
 
@@ -338,9 +346,9 @@ pub async fn stats(
             let some_clan_data;
             is_in_clan = true;
             (some_clan_data, overalls, try_recents) = join!(
-                fetch_all_clan(&user_region, clan.clan.clan_id),
-                fetch_overall_data(&user_region, &user_info, false),
-                fetch_recent_data(&user_region, &user_info, false),
+                fetch_all_clan(user_region, clan.clan.clan_id),
+                fetch_overall_data(user_region, user_info, false),
+                fetch_recent_data(user_region, user_info, false),
                 );
             match try_recents {
                 Some(r) => {recents = r;}
@@ -351,7 +359,7 @@ pub async fn stats(
         None => {
             is_in_clan = false;
             (overalls, try_recents) = join!(
-                fetch_overall_data(&user_region,&user_info, false),
+                fetch_overall_data(&user_region, &user_info, false),
                 fetch_recent_data(&user_region, &user_info, false),
                 );
             match try_recents {
@@ -365,10 +373,10 @@ pub async fn stats(
     all_data.overall = overalls;
     match period {
         Some(period) => {
-            embed = generate_period_embed(&all_data, period).await;
+            embed = generate_period_embed(all_data, period).await;
         }
         None => {
-            embed = generate_main_stat_embed(&all_data).await;
+            embed = generate_main_stat_embed(all_data).await;
         }
     }
 
@@ -419,7 +427,7 @@ pub async fn stats(
                     ComponentType::SelectMenu => {
                         let period = mci.data.values.first().unwrap();
                         println!("{}",period);
-                        embed = generate_period_embed(&all_data, Period::from_str(period).unwrap()).await;
+                        embed = generate_period_embed(all_data, Period::from_str(period).unwrap()).await;
                         if is_in_clan {
                             message.edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
                                 .components(|c| {
@@ -524,18 +532,3 @@ pub async fn stats(
             }
     Ok(())
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,3 +1,5 @@
+mod errors;
+
 mod commands;
 mod player_stats;
 use std::collections::HashMap;
@@ -34,13 +36,13 @@ pub struct Data {
 }
 
 
-type Error = Box<dyn std::error::Error + Send + Sync>;
+type Error = Box<dyn std::error::Error + Send + Sync>; //DO NOT OPEN PANDORA'S BOX
 type Context<'a> = poise::Context<'a, Data, Error>;
 
 pub fn get_short_position(position: &str) -> &str {
     match position {
-        "executive_officer" => {"XO"}
         "commander" => {"CDR"}
+        "executive_officer" => {"XO"}
         "personnel_officer" => {"PO"}
         "combat_officer" => {"CO"}
         "recruitment_officer" => {"RO"}
@@ -103,8 +105,11 @@ async fn main() {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 Ok(data)
             })
-        }); 
-    framework.run().await.unwrap();
+        });
+
+    if let Err(e) = framework.run().await {
+        eprintln!("{}", e);
+    }
 }
    
 
