@@ -25,20 +25,24 @@ pub struct OverallData {
 
 
 
-pub async fn fetch_overall_data(region: Region, user: Player, cached: bool) -> Result<OverallData, FetchOverallDataError> {
+pub async fn fetch_overall_data(region: &Region, user: &Player, cached: bool) -> Result<Option<OverallData>, FetchOverallDataError> {
 
-    let url = format!("{}{}{}{}",
-        "https://api.tomato.gg/dev/api-v2/overall/{}/{}",
-        match cached { true => "?cache=true", false => "" },
-        region.extension(), 
-        user.account_id
+    let url = format!("{}{}",
+        format!("https://api.tomato.gg/dev/api-v2/overall/{}/{}",
+            region.extension(),
+            user.account_id),
+        match cached { true => "?cache=true", false => "" }
     );
-
-    let data = reqwest::get(url)
+    let parsed_data = reqwest::get(url)
         .await?
         .json::<OverallResponse>()
-        .await?
-        .data;
+        .await;
 
-    Ok(data)
+    match parsed_data {
+        Ok(data) => {Ok(Some(data.data))}
+        Err(e) => {
+            println!("Testing Error in overall: {}",e);
+            Ok(None)
+        }
+    }
 }

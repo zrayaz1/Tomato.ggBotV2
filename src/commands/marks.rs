@@ -142,23 +142,20 @@ pub async fn fuzzy_find_tank(input: &str, tanks: &Vec<Tank>) -> String {
 }
 
 pub async fn generate_mark_embed(tank: &Tank, region: &Region) -> CreateEmbed{
-    let mut embed = CreateEmbed::default();
-    embed.title(format!("{} {}",tank.name, region.name()));
-    embed.url(format!("https://tomato.gg/tanks/NA/{}",tank.id));
-    embed.field("Marks(Dmg + Track/Spot)",
-    format!("1 Mark: `{}`\n2 Mark: `{}`\n3 Mark: `{}`\n100% MoE: `{}`",
-            tank.pct_65,tank.pct_85,tank.pct_95,tank.pct_100),true);
-    embed.field("Mastery(XP)",
-    format!("3rd Class: `{}`\n2nd Class: `{}`\n1st Class: `{}`\nMastery: `{}`",
-            tank.third,tank.second,tank.first,tank.ace),true);
-    embed.thumbnail(&tank.images.big_icon);
-    embed.footer(|f| {
-        f.text("Powered by Tomato.gg");
-        f.icon_url("https://tomato.gg/_next/image?url=%2Ftomato.png&w=48&q=75");
-        f
-        });
-    embed
-    
+    CreateEmbed::default().title(format!("{} {}",tank.name, region.name()))
+        .url(format!("https://tomato.gg/tanks/NA/{}",tank.id))
+        .field("Marks(Dmg + Track/Spot)",
+            format!("1 Mark: `{}`\n2 Mark: `{}`\n3 Mark: `{}`\n100% MoE: `{}`",
+            tank.pct_65,tank.pct_85,tank.pct_95,tank.pct_100),true)
+        .field("Mastery(XP)",
+            format!("3rd Class: `{}`\n2nd Class: `{}`\n1st Class: `{}`\nMastery: `{}`",
+            tank.third,tank.second,tank.first,tank.ace),true)
+        .thumbnail(&tank.images.big_icon)
+        .footer(|f| {
+            f.text("Powered by Tomato.gg");
+            f.icon_url("https://tomato.gg/_next/image?url=%2Ftomato.png&w=48&q=75");
+            f
+        }).to_owned()
 }
 
 #[poise::command(slash_command)]

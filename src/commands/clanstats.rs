@@ -5,7 +5,7 @@ use poise::serenity_prelude::CreateEmbed;
 use crate::errors::*;
 use crate::{Region, Error, Context};
 
-use super::stats::{Emblems, ClanInfoResponse};
+use super::stats::Emblems;
 
 
 #[derive(Deserialize)]
@@ -22,11 +22,11 @@ pub struct ClanId {
 
 #[derive(Deserialize, Default, Clone)]
 pub struct TomatoClan {
-    name: String,
-    tag: String,
-    color: String,
+    pub name: String,
+    pub tag: String,
+    pub color: String,
     motto: String,
-    emblems: Emblems,
+    pub emblems: Emblems,
     #[serde(rename = "overallWN8")]
     overall_wn8: f32,
     #[serde(rename = "overallWinrate")]
@@ -82,13 +82,15 @@ pub struct Value {
     value: f32,
 }
 
+#[derive(Clone)]
 pub struct ClanData {
-    rating: Option<RatingClanData>,
-    global: Option<GlobalClanData>,
-    tomato: TomatoClan,
+    pub rating: Option<RatingClanData>,
+    pub global: Option<GlobalClanData>,
+    pub tomato: TomatoClan,
 }
 
-pub async fn fetch_global_map(region: Region, clan_id: u32) -> Result<Option<GlobalClanData>, GlobalMapFetchError> {
+pub async fn fetch_global_map(region: Region, clan_id: u32)
+    -> Result<Option<GlobalClanData>, GlobalMapFetchError> {
     let global_map_url = format!(
         "https://api.worldoftanks.{}/wot/globalmap/claninfo/?application_id=20e1e0e4254d98635796fc71f2dfe741&clan_id={}",
         region.extension(), 
@@ -170,10 +172,11 @@ pub async fn fetch_clan_id(region: Region, clan: &str) -> Result<u32, FetchClanI
 }
 
 
-pub async fn generate_clan_embed(data: ClanData) -> CreateEmbed {
+pub async fn generate_clan_embed(data: &ClanData) -> CreateEmbed {
     let tomato = &data.tomato;
     let rating = data.rating.clone().unwrap_or_default();
     let global = data.global.clone().unwrap_or_default();
+
     
     CreateEmbed::default()
         .title(format!("[{}] {}", tomato.tag, tomato.name))
@@ -210,12 +213,7 @@ pub async fn generate_clan_embed(data: ClanData) -> CreateEmbed {
                     global.statistics.battles_10_level as f32)*100.0),
                     global.statistics.provinces_count,
                 ),true
-            ).color(i32::from_str_radix(
-                tomato
-                .color
-                .as_str()[1..]
-                .as_ref(), 16
-            ).unwrap())
+            ).color(i32::from_str_radix(&tomato.color[1..],16).unwrap())
         .to_owned()
 
 }
@@ -237,7 +235,7 @@ pub async fn clanstats(
     }
 
     let embed = generate_clan_embed(
-        fetch_all_clan(region, clan_id_result.unwrap())
+        &fetch_all_clan(region, clan_id_result.unwrap())
         .await?
     )
     .await;
