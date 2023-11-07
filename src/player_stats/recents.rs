@@ -83,8 +83,7 @@ pub async fn fetch_recent_data(region: &Region, user: &Player, cached: bool)
 
     match parsed_data {
         Ok(data) => {Ok(Some(data.data))}
-        Err(e) => {
-            println!("Testing Error in recents: {}",e);
+        Err(_) => {
             Ok(None)
         }
     }

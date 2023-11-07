@@ -33,6 +33,7 @@ pub async fn fetch_overall_data(region: &Region, user: &Player, cached: bool) ->
             user.account_id),
         match cached { true => "?cache=true", false => "" }
     );
+
     let parsed_data = reqwest::get(url)
         .await?
         .json::<OverallResponse>()
@@ -40,8 +41,7 @@ pub async fn fetch_overall_data(region: &Region, user: &Player, cached: bool) ->
 
     match parsed_data {
         Ok(data) => {Ok(Some(data.data))}
-        Err(e) => {
-            println!("Testing Error in overall: {}",e);
+        Err(_) => {
             Ok(None)
         }
     }
