@@ -1,10 +1,8 @@
 use serde::Deserialize;
 use serde::Deserializer;
-
 use crate::Region;
 use crate::commands::stats::Player;
-use tokio::time::{Instant, timeout, Duration};
-
+use crate::errors::FetchRecentsDataError;
 
 fn deserialize_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
@@ -67,29 +65,27 @@ pub struct TankStats {
 }
 
 
-pub async fn fetch_recent_data(region: &Region, user: &Player, cached: bool) -> Option<RecentsData> {
-    let start = Instant::now();
-    let recents_url;
-    match cached {
-        true => { 
-        recents_url = 
-            format!("https://api.tomato.gg/dev/api-v2/recents/{}/{}?cache=true", region.extension(), user.account_id);
+pub async fn fetch_recent_data(region: &Region, user: &Player, cached: bool)
+        -> Result<Option<RecentsData>, FetchRecentsDataError> {
+
+
+    let url = format!("{}{}",
+        format!("https://api.tomato.gg/dev/api-v2/recents/{}/{}",
+            region.extension(),
+            user.account_id),
+        match cached { true => "?cache=true", false => "" }
+    );
+
+    let parsed_data = reqwest::get(url)
+        .await?
+        .json::<RecentsResponse>()
+        .await;
+
+    match parsed_data {
+        Ok(data) => {Ok(Some(data.data))}
+        Err(_) => {
+            Ok(None)
         }
-        false => {
-        recents_url = 
-            format!("https://api.tomato.gg/dev/api-v2/recents/{}/{}", region.extension(), user.account_id);
-        }
-    }
-    let response = timeout(Duration::from_secs(10), reqwest::get(&recents_url)).await;
-    match response {
-        Ok(Ok(resp)) => {
-            let recents_response: RecentsResponse = resp.json().await.unwrap();
-            let duration = start.elapsed();
-            println!("fetched recent stats for {} in {:?}", user.account_id, duration);
-            Some(recents_response.data)
-        }
-        Ok(Err(_)) => {None}
-        Err(_) => {None}
     }
 }
 

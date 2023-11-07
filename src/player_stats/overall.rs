@@ -1,8 +1,7 @@
 use serde::Deserialize;
 use crate::Region;
 use crate::commands::stats::Player;
-use tokio::time::Instant;
-
+use crate::errors::FetchOverallDataError;
 
 #[derive(Deserialize)]
 struct OverallResponse {
@@ -26,40 +25,24 @@ pub struct OverallData {
 
 
 
-pub async fn fetch_overall_data(region: &Region, user: &Player, cached: bool) -> OverallData {
-    let start = Instant::now();
-    let overall_url;
-    match cached {
-        true => { 
-        overall_url = 
-            format!("https://api.tomato.gg/dev/api-v2/overall/{}/{}?cache=true", region.extension(), user.account_id);
-        }
-        false => {
-        overall_url = 
-            format!("https://api.tomato.gg/dev/api-v2/overall/{}/{}", region.extension(), user.account_id);
+pub async fn fetch_overall_data(region: &Region, user: &Player, cached: bool) -> Result<Option<OverallData>, FetchOverallDataError> {
+
+    let url = format!("{}{}",
+        format!("https://api.tomato.gg/dev/api-v2/overall/{}/{}",
+            region.extension(),
+            user.account_id),
+        match cached { true => "?cache=true", false => "" }
+    );
+
+    let parsed_data = reqwest::get(url)
+        .await?
+        .json::<OverallResponse>()
+        .await;
+
+    match parsed_data {
+        Ok(data) => {Ok(Some(data.data))}
+        Err(_) => {
+            Ok(None)
         }
     }
-
-    let overall_response: OverallResponse = 
-        reqwest::get(overall_url).await.unwrap().json().await.unwrap();
-    let duration = start.elapsed();
-    println!("fetched overall starts for {} in {:?}", user.account_id, duration);
-    overall_response.data
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
