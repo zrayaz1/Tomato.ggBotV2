@@ -817,7 +817,6 @@ pub async fn stats(
         .await?;
     }
     //removes buttons and select after timeout
-    println!("sanity check");
     message.edit(ctx, |f| {
     f.components(|c| c);
     f.embeds.push(embed);
