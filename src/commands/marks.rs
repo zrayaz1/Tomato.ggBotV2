@@ -8,6 +8,7 @@ use fuzzywuzzy::utils;
 use fuzzywuzzy::process;
 use crate::{Region,Context, Error};
 use tokio::{task, time};
+use serde_json::Value;
 
 
 #[derive(Deserialize)]
@@ -21,6 +22,25 @@ pub struct MetaData {
     status: String,
 }
 
+
+fn deserialize_str_to_u32<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+ let value: Value = serde::Deserialize::deserialize(deserializer)?;
+
+    match value {
+        Value::Number(n) => {
+            if let Some(v) = n.as_u64() {
+                Ok(v as u32)
+            } else {
+                Err(serde::de::Error::custom("Expected u32 for third"))
+            }
+        }
+        Value::String(_) => Ok(0), // Treat String as 0
+        _ => Err(serde::de::Error::custom("Expected u32 or String for third")),
+    }
+}
 #[derive(Deserialize, Debug)]
 pub struct Tank {
     id: u32,
@@ -54,7 +74,7 @@ pub struct Tank {
     #[serde(default)]
     #[serde(rename = "2nd")]
     second: u32,
-    #[serde(default)]
+    #[serde(default,deserialize_with = "deserialize_str_to_u32")]
     #[serde(rename = "3rd")]
     third: u32,
     #[serde(default)]
