@@ -47,8 +47,6 @@ pub struct GlobalResponse {
 #[derive(Deserialize, Clone, Default)]
 pub struct GlobalClanData {
     statistics: GlobalStatistics,
-    tag: String,
-    name: String,
 }
 
 #[derive(Deserialize, Clone, Default)]
@@ -66,8 +64,6 @@ pub struct RatingResponse {
 
 #[derive(Deserialize, Clone, Default)]
 pub struct RatingClanData {
-    clan_name: String,
-    clan_tag: String,
     efficiency: Value,
     battles_count_avg_daily: Value,
     global_rating_weighted_avg: Value,

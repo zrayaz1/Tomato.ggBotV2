@@ -12,7 +12,7 @@ use crate::{
     Context, Error, Region,
 };
 use poise::serenity_prelude::{
-    ComponentType, CreateEmbed, CreateSelectMenu, CreateSelectMenuOption, CreateSelectMenuOptions,
+    ComponentType, CreateEmbed, CreateSelectMenu, CreateSelectMenuOption, CreateSelectMenuOptions, CreateComponents,
 };
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -23,7 +23,6 @@ use tokio::join;
 
 #[derive(Deserialize)]
 pub struct ClanInfoResponse {
-    status: String,
     data: HashMap<String, Option<PlayerAccountInfo>>,
 }
 
@@ -31,19 +30,11 @@ pub struct ClanInfoResponse {
 #[derive(Deserialize, Clone)]
 pub struct PlayerAccountInfo {
     clan: PlayerClanInfo,
-    account_id: u32,
-    role_i18n: String,
-    joined_at: u64,
     role: String,
-    account_name: String,
 }
 
 #[derive(Deserialize, Clone)]
 pub struct PlayerClanInfo {
-    members_count: u32,
-    name: String,
-    color: String,
-    created_at: u64,
     tag: String,
     emblems: Emblems,
     clan_id: u32,
@@ -61,7 +52,6 @@ pub struct EmblemURL {
 
 #[derive(Deserialize)]
 pub struct UserSearch {
-    status: String,
     #[serde(default)]
     data: Vec<Player>,
 }
@@ -372,7 +362,8 @@ pub async fn generate_main_stat_embed(
     Ok(embed)
 }
 
-pub fn create_select_menu(id: u64) -> CreateSelectMenu {
+pub fn add_options(menu: &mut CreateSelectMenu) 
+    -> &mut CreateSelectMenu {
     let mut options = CreateSelectMenuOptions::default();
 
     for period in Period::iter() {
@@ -382,18 +373,45 @@ pub fn create_select_menu(id: u64) -> CreateSelectMenu {
         options.add_option(option);
     }
 
-    CreateSelectMenu::default()
-        .custom_id(id)
+    menu
+        .custom_id("menu")
         .min_values(1)
         .max_values(1)
         .options(|o| {
             o.clone_from(&options);
             o
         })
-        .to_owned()
 }
 
+pub fn create_menu_only(component: &mut CreateComponents) 
+    -> &mut CreateComponents {
+        component.create_action_row(|ar| {
+            ar.create_select_menu(add_options)
+        })
+}
 
+pub fn create_all_components(component: &mut CreateComponents)
+    -> &mut CreateComponents {
+    component.create_action_row(|ar| {
+        ar.create_select_menu(add_options)
+    })
+    .create_action_row(|ar| {
+        ar.create_button(|b| {
+            b.custom_id("player")
+                .style(poise::serenity_prelude::ButtonStyle::Primary)
+                .label("Player Stats")
+        })
+        .create_button(|b| {
+            b.custom_id("clan")
+                .style(poise::serenity_prelude::ButtonStyle::Success)
+                .label("Clan Stats")
+
+        })
+
+
+    })
+
+}
 
 
 #[poise::command(slash_command)]
@@ -404,7 +422,6 @@ pub async fn stats(
     #[description = "Detailed Stats for a Period"] period: Option<Period>,
 ) -> Result<(), Error> {
     ctx.defer().await?;
-    let uuid = ctx.id();
     let user_info;
     let user_region: Region;
 
@@ -636,60 +653,23 @@ pub async fn stats(
     if all_data.is_in_clan {
         message
             .edit(ctx, |f| {
-                f.embed(|f| {
-                    f.clone_from(&embed);
-                    f
-                })
-                .components(|c| {
-                    c.create_action_row(|ar| {
-                        ar.create_select_menu(|sm| {
-                            sm.clone_from(&create_select_menu(uuid));
-                            sm
-                        })
-                    })
-                    .create_action_row(|ar| {
-                        ar.create_button(|b| {
-                            b.custom_id(uuid * 2)
-                                .style(poise::serenity_prelude::ButtonStyle::Primary)
-                                .label("Player Stats")
-                        })
-                        .create_button(|b| {
-                            b.custom_id(uuid * 3)
-                                .style(poise::serenity_prelude::ButtonStyle::Success)
-                                .label("Clan Stats")
-                        })
-                    })
-                })
+                f.embed(|f| {f.clone_from(&embed);f});
+                f.components(create_all_components)
             })
             .await?;
     } else {
         message
-            .edit(ctx, |f| {
-                f.embed(|f| {
-                    f.clone_from(&embed);
-                    f
-                })
-                .components(|c| {
-                    c.create_action_row(|ar| {
-                        ar.create_select_menu(|sm| {
-                            sm.clone_from(&create_select_menu(uuid));
-                            sm
-                        })
-                    })
-                })
+            .edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
+                .components(create_menu_only)
             })
             .await?;
     }
-
+    let message_id = message.message().await.unwrap().id;
     while let Some(mci) = poise::serenity_prelude::CollectComponentInteraction::new(ctx)
         .author_id(ctx.author().id)
         .channel_id(ctx.channel_id())
         .timeout(std::time::Duration::from_secs(120))
-        .filter(move |mci| {
-            mci.data.custom_id == uuid.to_string()
-                || mci.data.custom_id == (uuid * 2).to_string()
-                || mci.data.custom_id == (uuid * 3).to_string()
-        })
+        .filter(move |mci| {mci.message.id == message_id})
         .await
     {
         match mci.data.component_type {
@@ -701,107 +681,36 @@ pub async fn stats(
                 if all_data.is_in_clan {
                     message
                         .edit(ctx, |f| {
-                            f.embed(|f| {
-                                f.clone_from(&embed);
-                                f
-                            })
-                            .components(|c| {
-                                c.create_action_row(|ar| {
-                                    ar.create_select_menu(|sm| {
-                                        sm.clone_from(&create_select_menu(uuid));
-                                        sm
-                                    })
-                                })
-                                .create_action_row(|ar| {
-                                    ar.create_button(|b| {
-                                        b.custom_id(uuid * 2)
-                                            .style(poise::serenity_prelude::ButtonStyle::Primary)
-                                            .label("Player Stats")
-                                    })
-                                    .create_button(|b| {
-                                        b.custom_id(uuid * 3)
-                                            .style(poise::serenity_prelude::ButtonStyle::Success)
-                                            .label("Clan Stats")
-                                    })
-                                })
-                            })
+                            f.embed(|f| {f.clone_from(&embed);f})
+                            .components(create_all_components)
                         })
                         .await?;
                 } else {
                     message
-                        .edit(ctx, |f| {
-                            f.embed(|f| {
-                                f.clone_from(&embed);
-                                f
-                            })
-                            .components(|c| {
-                                c.create_action_row(|ar| {
-                                    ar.create_select_menu(|sm| {
-                                        sm.clone_from(&create_select_menu(uuid));
-                                        sm
-                                    })
-                                })
-                            })
+                        .edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
+                            .components(create_menu_only)
                         })
                         .await?;
                 }
             }
             ComponentType::Button => {
-                let player_id = (uuid * 2).to_string();
-                let clan_id = (uuid * 3).to_string();
-                if mci.data.custom_id.clone() == player_id {
+                let player_id = "player";
+                let clan_id = "clan";
+                if &mci.data.custom_id == player_id {
                     embed = generate_main_stat_embed(&all_data).await.unwrap();
                     message
                         .edit(ctx, |f| {
-                            f.embed(|f| {
-                                f.clone_from(&embed);
-                                f
-                            })
-                            .components(|c| {
-                                c.create_action_row(|ar| {
-                                    ar.create_select_menu(|sm| {
-                                        sm.clone_from(&create_select_menu(uuid));
-                                        sm
-                                    })
-                                })
-                                .create_action_row(|ar| {
-                                    ar.create_button(|b| {
-                                        b.custom_id(uuid * 2)
-                                            .style(poise::serenity_prelude::ButtonStyle::Primary)
-                                            .label("Player Stats")
-                                    })
-                                    .create_button(|b| {
-                                        b.custom_id(uuid * 3)
-                                            .style(poise::serenity_prelude::ButtonStyle::Success)
-                                            .label("Clan Stats")
-                                    })
-                                })
-                            })
+                            f.embed(|f| {f.clone_from(&embed);f})
+                            .components(create_all_components)
                         })
                         .await?;
-                } else if mci.data.custom_id.clone() == clan_id {
-                    embed = generate_clan_embed(all_data.clan.as_ref().unwrap()).await;
+                } else if &mci.data.custom_id == clan_id {
+                    let new_embed = generate_clan_embed(all_data.clan.as_ref().unwrap()).await;
 
                     message
                         .edit(ctx, |f| {
-                            f.embed(|f| {
-                                f.clone_from(&embed);
-                                f
-                            })
-                            .components(|c| {
-                                c.create_action_row(|ar| {
-                                    ar.create_button(|b| {
-                                        b.custom_id(uuid * 2)
-                                            .style(poise::serenity_prelude::ButtonStyle::Primary)
-                                            .label("Player Stats")
-                                    })
-                                    .create_button(|b| {
-                                        b.custom_id(uuid * 3)
-                                            .style(poise::serenity_prelude::ButtonStyle::Success)
-                                            .label("Clan Stats")
-                                    })
-                                })
-                            })
+                            f.embeds.push(new_embed);
+                            f.components(create_all_components)
                         })
                         .await?;
                 }

@@ -1,12 +1,14 @@
 mod errors;
-
 mod commands;
 mod player_stats;
 use std::collections::HashMap;
+use tokio::time;
+use std::time::Duration;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use strum_macros::EnumIter;
 use poise::serenity_prelude as serenity;
-use commands::marks::{fetch_tank_data, Tank, marks,};
+use commands::marks::{Tank, marks, generate_tank_map,TankEconomics,fetch_tank_economics};
 use commands::stats::stats;
 use commands::clanstats::clanstats; 
 
@@ -31,12 +33,12 @@ impl Region {
 
 
 pub struct Data {
-    tank_data: Mutex<HashMap<Region, Vec<Tank>>>,
-    loop_running: Mutex<bool>,
+    tank_data: Arc<Mutex<HashMap<Region, Vec<Tank>>>>,
+    tank_economics: Arc<Mutex<Vec<TankEconomics>>>,
 }
 
 
-type Error = Box<dyn std::error::Error + Send + Sync>; //DO NOT OPEN PANDORA'S BOX
+type Error = Box<dyn std::error::Error + Send + Sync>; 
 type Context<'a> = poise::Context<'a, Data, Error>;
 
 pub fn get_short_position(position: &str) -> &str {
@@ -76,22 +78,38 @@ pub fn get_wn8_color(wn8: u32) -> i32 {
     }
 }
 
+
+
+async fn update_tank_data(data: Arc<Mutex<HashMap<Region, Vec<Tank>>>>) {
+    let mut interval = time::interval(Duration::from_secs(36000));
+    loop {
+        interval.tick().await;
+        let mut old = data.lock().await;
+        *old = generate_tank_map().await;
+    }
+}
+
+async fn update_tank_economics(economics: Arc<Mutex<Vec<TankEconomics>>>) {
+    let mut interval = time::interval(Duration::from_secs(128000));
+    loop {
+        interval.tick().await;
+        let mut old = economics.lock().await;
+        match fetch_tank_economics().await {
+            Ok(tanks) => {*old = tanks;}
+            Err(e) => {println!("Error in tank economics: {}",e);}
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
-    let mut tank_info = HashMap::new();
-    let (na, eu, asia) = tokio::join!(
-        fetch_tank_data(&Region::NA),
-        fetch_tank_data(&Region::EU),
-        fetch_tank_data(&Region::ASIA));
-    
-    tank_info.insert(Region::NA, na);
-    tank_info.insert(Region::EU, eu);
-    tank_info.insert(Region::ASIA, asia);
 
     let data = Data{
-        tank_data: Mutex::new(tank_info),
-        loop_running: Mutex::new(false),
+        tank_data: Arc::new(Mutex::new(HashMap::new())),
+        tank_economics: Arc::new(Mutex::new(Vec::new())),
     };
+    tokio::spawn(update_tank_data(Arc::clone(&data.tank_data)));
+    tokio::spawn(update_tank_economics(Arc::clone(&data.tank_economics)));
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {

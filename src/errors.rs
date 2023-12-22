@@ -23,6 +23,13 @@ pub enum ClanRatingFetchError {
     ParseResponseError(#[from] reqwest::Error),
 }
 
+#[derive(Debug, Error)]
+pub enum TankEconomicsFetchError {
+    #[error("Error fetching Economic Data: {0}")]
+    ReqwestResponseError(#[from] Error),
+    #[error("Error parsing Economic Data: {0}")]
+    ParseResponseError(#[from] reqwest::Error),
+}
 
 #[derive(Debug, Error)]
 pub enum ClanInfoFetchError {
@@ -82,8 +89,6 @@ pub enum FetchRecentsDataError {
 pub enum FetchUserIDError {
     #[error("Error getting User ID from server: {0}")]
     ReqwestResponseError(#[from] reqwest::Error),
-    #[error("Empty response returned from fetching Clan ID")]
-    EmptyResponse,
 }
 
 #[derive(Debug, Error)]
