@@ -4,11 +4,12 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub(crate) enum ExecutionError {
     #[error("Error during Serenity API Execution")]
-    SerenityApiError(#[from] serenity::Error)
+    SerenityApiError(#[from] serenity::Error),
 }
 
 #[derive(Debug, Error)]
-pub enum GlobalMapFetchError { //I can think of some global map errors other than this one
+pub enum GlobalMapFetchError {
+    //I can think of some global map errors other than this one
     #[error("Error fetching Global Map data: {0}")]
     ReqwestResponseError(#[from] Error),
     #[error("Error parsing Global Map data: {0}")]
@@ -23,6 +24,13 @@ pub enum ClanRatingFetchError {
     ParseResponseError(#[from] reqwest::Error),
 }
 
+#[derive(Debug, Error)]
+pub enum RecentTankStatsFetchError {
+    #[error("Error fetching recent tank stats Data: {0}")]
+    ReqwestResponseError(#[from] Error),
+    #[error("Error parsing recent tank stats Data: {0}")]
+    ParseResponseError(#[from] reqwest::Error),
+}
 #[derive(Debug, Error)]
 pub enum TankEconomicsFetchError {
     #[error("Error fetching Economic Data: {0}")]
@@ -57,7 +65,6 @@ pub enum FetchAllClanDataError {
     TomatoClanError(#[from] TomatoClanFetchError),
 }
 
-
 #[derive(Debug, Error)]
 pub enum FetchClanIDError {
     #[error("Error getting Clan ID from server: {0}")]
@@ -65,7 +72,6 @@ pub enum FetchClanIDError {
     #[error("Empty response returned from fetching Clan ID")]
     EmptyResponse,
 }
-
 
 #[derive(Debug, Error)]
 pub enum FetchOverallDataError {
@@ -75,7 +81,6 @@ pub enum FetchOverallDataError {
     ParseResponseError(#[from] reqwest::Error),
 }
 
-
 #[derive(Debug, Error)]
 pub enum FetchRecentsDataError {
     #[error("Error fetching Recents Tomato.gg data: {0}")]
@@ -83,7 +88,6 @@ pub enum FetchRecentsDataError {
     #[error("Error parsing Recents Tomato.gg data: {0}")]
     ParseResponseError(#[from] reqwest::Error),
 }
-
 
 #[derive(Debug, Error)]
 pub enum FetchUserIDError {
@@ -95,9 +99,7 @@ pub enum FetchUserIDError {
 pub enum CreatePeriodEmbedError {
     #[error("Missing Required Recents Data")]
     MissingRecentsError,
-
 }
-
 
 #[derive(Debug, Error)]
 pub enum CreateMainStatEmbedError {
@@ -106,15 +108,3 @@ pub enum CreateMainStatEmbedError {
     #[error("Missing Required Overall Data")]
     MissingOverallError,
 }
-
-
-
-
-
-
-
-
-
-
-
-

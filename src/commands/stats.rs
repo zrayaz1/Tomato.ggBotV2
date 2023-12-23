@@ -12,7 +12,8 @@ use crate::{
     Context, Error, Region,
 };
 use poise::serenity_prelude::{
-    ComponentType, CreateEmbed, CreateSelectMenu, CreateSelectMenuOption, CreateSelectMenuOptions, CreateComponents,
+    ComponentType, CreateComponents, CreateEmbed, CreateSelectMenu, CreateSelectMenuOption,
+    CreateSelectMenuOptions,
 };
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -207,7 +208,9 @@ pub async fn generate_period_embed(
     let data;
 
     match player_data.get_period_data(period) {
-        Some(player_data) => {data = player_data;}
+        Some(player_data) => {
+            data = player_data;
+        }
         None => {
             return Err(CreatePeriodEmbedError::MissingRecentsError);
         }
@@ -362,8 +365,7 @@ pub async fn generate_main_stat_embed(
     Ok(embed)
 }
 
-pub fn add_options(menu: &mut CreateSelectMenu) 
-    -> &mut CreateSelectMenu {
+pub fn add_options(menu: &mut CreateSelectMenu) -> &mut CreateSelectMenu {
     let mut options = CreateSelectMenuOptions::default();
 
     for period in Period::iter() {
@@ -373,8 +375,7 @@ pub fn add_options(menu: &mut CreateSelectMenu)
         options.add_option(option);
     }
 
-    menu
-        .custom_id("menu")
+    menu.custom_id("menu")
         .min_values(1)
         .max_values(1)
         .options(|o| {
@@ -383,36 +384,26 @@ pub fn add_options(menu: &mut CreateSelectMenu)
         })
 }
 
-pub fn create_menu_only(component: &mut CreateComponents) 
-    -> &mut CreateComponents {
-        component.create_action_row(|ar| {
-            ar.create_select_menu(add_options)
-        })
+pub fn create_menu_only(component: &mut CreateComponents) -> &mut CreateComponents {
+    component.create_action_row(|ar| ar.create_select_menu(add_options))
 }
 
-pub fn create_all_components(component: &mut CreateComponents)
-    -> &mut CreateComponents {
-    component.create_action_row(|ar| {
-        ar.create_select_menu(add_options)
-    })
-    .create_action_row(|ar| {
-        ar.create_button(|b| {
-            b.custom_id("player")
-                .style(poise::serenity_prelude::ButtonStyle::Primary)
-                .label("Player Stats")
+pub fn create_all_components(component: &mut CreateComponents) -> &mut CreateComponents {
+    component
+        .create_action_row(|ar| ar.create_select_menu(add_options))
+        .create_action_row(|ar| {
+            ar.create_button(|b| {
+                b.custom_id("player")
+                    .style(poise::serenity_prelude::ButtonStyle::Primary)
+                    .label("Player Stats")
+            })
+            .create_button(|b| {
+                b.custom_id("clan")
+                    .style(poise::serenity_prelude::ButtonStyle::Success)
+                    .label("Clan Stats")
+            })
         })
-        .create_button(|b| {
-            b.custom_id("clan")
-                .style(poise::serenity_prelude::ButtonStyle::Success)
-                .label("Clan Stats")
-
-        })
-
-
-    })
-
 }
-
 
 #[poise::command(slash_command)]
 pub async fn stats(
@@ -620,46 +611,61 @@ pub async fn stats(
 
     match period {
         Some(period) => match generate_period_embed(&all_data, period).await {
-            Ok(period_embed) => {embed = period_embed;}
+            Ok(period_embed) => {
+                embed = period_embed;
+            }
 
             Err(_) => {
                 embed = CreateEmbed::default()
-                    .title("User Not Found on Tomato.gg").to_owned();
+                    .title("User Not Found on Tomato.gg")
+                    .to_owned();
                 message
                     .edit(ctx, |f| {
                         f.embeds.push(embed);
-                        f}
-                    ).await?;
+                        f
+                    })
+                    .await?;
                 return Ok(());
             }
-        }
+        },
 
         None => match generate_main_stat_embed(&all_data).await {
-            Ok(stat_embed) => { embed = stat_embed;}
+            Ok(stat_embed) => {
+                embed = stat_embed;
+            }
 
             Err(_) => {
                 embed = CreateEmbed::default()
-                    .title("User Not Found on Tomato.gg").to_owned();
+                    .title("User Not Found on Tomato.gg")
+                    .to_owned();
                 message
                     .edit(ctx, |f| {
                         f.embeds.push(embed);
-                        f}).await?;
+                        f
+                    })
+                    .await?;
                 return Ok(());
             }
-        }
+        },
     }
-    
 
     if all_data.is_in_clan {
         message
             .edit(ctx, |f| {
-                f.embed(|f| {f.clone_from(&embed);f});
+                f.embed(|f| {
+                    f.clone_from(&embed);
+                    f
+                });
                 f.components(create_all_components)
             })
             .await?;
     } else {
         message
-            .edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
+            .edit(ctx, |f| {
+                f.embed(|f| {
+                    f.clone_from(&embed);
+                    f
+                })
                 .components(create_menu_only)
             })
             .await?;
@@ -669,7 +675,7 @@ pub async fn stats(
         .author_id(ctx.author().id)
         .channel_id(ctx.channel_id())
         .timeout(std::time::Duration::from_secs(120))
-        .filter(move |mci| {mci.message.id == message_id})
+        .filter(move |mci| mci.message.id == message_id)
         .await
     {
         match mci.data.component_type {
@@ -681,13 +687,20 @@ pub async fn stats(
                 if all_data.is_in_clan {
                     message
                         .edit(ctx, |f| {
-                            f.embed(|f| {f.clone_from(&embed);f})
+                            f.embed(|f| {
+                                f.clone_from(&embed);
+                                f
+                            })
                             .components(create_all_components)
                         })
                         .await?;
                 } else {
                     message
-                        .edit(ctx, |f| {f.embed(|f| {f.clone_from(&embed);f})
+                        .edit(ctx, |f| {
+                            f.embed(|f| {
+                                f.clone_from(&embed);
+                                f
+                            })
                             .components(create_menu_only)
                         })
                         .await?;
@@ -700,7 +713,10 @@ pub async fn stats(
                     embed = generate_main_stat_embed(&all_data).await.unwrap();
                     message
                         .edit(ctx, |f| {
-                            f.embed(|f| {f.clone_from(&embed);f})
+                            f.embed(|f| {
+                                f.clone_from(&embed);
+                                f
+                            })
                             .components(create_all_components)
                         })
                         .await?;
@@ -726,11 +742,13 @@ pub async fn stats(
         .await?;
     }
     //removes buttons and select after timeout
-    message.edit(ctx, |f| {
-    f.components(|c| c);
-    f.embeds.push(embed);
-    f
-    }).await?;
+    message
+        .edit(ctx, |f| {
+            f.components(|c| c);
+            f.embeds.push(embed);
+            f
+        })
+        .await?;
 
     Ok(())
 }

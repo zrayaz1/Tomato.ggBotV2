@@ -1,8 +1,8 @@
-use serde::Deserialize;
-use serde::Deserializer;
-use crate::Region;
 use crate::commands::stats::Player;
 use crate::errors::FetchRecentsDataError;
+use crate::Region;
+use serde::Deserialize;
+use serde::Deserializer;
 
 fn deserialize_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
@@ -17,7 +17,6 @@ where
 struct RecentsResponse {
     data: RecentsData,
 }
-
 
 #[derive(Debug, Deserialize, Clone, Default)]
 pub struct RecentsData {
@@ -64,28 +63,28 @@ pub struct TankStats {
     pub win_rate: f32,
 }
 
-
-pub async fn fetch_recent_data(region: &Region, user: &Player, cached: bool)
-        -> Result<Option<RecentsData>, FetchRecentsDataError> {
-
-
-    let url = format!("{}{}",
-        format!("https://api.tomato.gg/dev/api-v2/recents/{}/{}",
+pub async fn fetch_recent_data(
+    region: &Region,
+    user: &Player,
+    cached: bool,
+) -> Result<Option<RecentsData>, FetchRecentsDataError> {
+    let url = format!(
+        "{}{}",
+        format!(
+            "https://api.tomato.gg/dev/api-v2/recents/{}/{}",
             region.extension(),
-            user.account_id),
-        match cached { true => "?cache=true", false => "" }
+            user.account_id
+        ),
+        match cached {
+            true => "?cache=true",
+            false => "",
+        }
     );
 
-    let parsed_data = reqwest::get(url)
-        .await?
-        .json::<RecentsResponse>()
-        .await;
+    let parsed_data = reqwest::get(url).await?.json::<RecentsResponse>().await;
 
     match parsed_data {
-        Ok(data) => {Ok(Some(data.data))}
-        Err(_) => {
-            Ok(None)
-        }
+        Ok(data) => Ok(Some(data.data)),
+        Err(_) => Ok(None),
     }
 }
-
